@@ -18,19 +18,88 @@
 # Author:
 #   philip-scott
 
+
+
 module.exports = (robot) ->
   robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*)$/i, (msg) ->
+    valid = paymentValidator(robot, msg)
+    if not valid
+      return
+
     amount = parseFloat(msg.match[1])
     user = robot.brain.userForName(msg.match[2])
-    msg.reply "DEMO: payment register for " + amount + " to " + require('util').inspect msg
+    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name
+
   robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*) for ([^ ]*)$/i, (msg) ->
+    valid = paymentValidator(robot, msg)
+    if not valid
+      return
+
     amount = parseFloat(msg.match[1])
-    msg.reply "DEMO: payment register for " + amount + " to " + msg.match[2] + " for " + msg.match[3]
+    user = robot.brain.userForName(msg.match[2])
+    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name + "for " + msg.match[3]
+
   robot.respond /balance$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance: "
+
   robot.respond /balance me$/i, (msg) ->
     msg.reply "DEMO: Showing your balance: "
+
   robot.respond /balance for ([^ ]*)$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance for event " + msg.match[1]
+
   robot.respond /balance me for ([^ ]*)$/i, (msg) ->
     msg.reply "DEMO: Showing your balance for event  " + msg.match[1]
+
+  robot.respond /testing/, (msg) ->
+
+
+
+paymentValidator = (robot, msg) ->
+  amount = parseFloat(msg.match[1])
+  if amount <= 0
+    sendError msg, "Amount must be greater than 0"
+    return false
+
+  payer = msg.message.user
+  receiver = robot.brain.userForName msg.match[2]
+
+  if receiver is null
+    sendError msg, "This user does not exist"
+    return false
+
+  if receiver.slack.is_bot or receiver.slack.is_restricted or receiver.slack.is_app_user
+    sendError msg, "This user cannot receive a payment"
+    return false
+
+  if (payer is null or payer is undefined or payer.is_bot or payer.is_restricted or payer.is_app_user)
+    sendError msg, "You're not allowed to send a payment"
+    return false
+
+  if (payer.id is receiver.slack.id)
+    sendError msg, "You're not allowed to send a payment to yourself"
+    return false
+
+  return true
+
+sendError = (msg, message) ->
+  msg.send({
+      attachments: [{
+          title: 'Error: ' + message,
+          fallback: 'Error: ' + message,
+          color: "#D50200"
+      }],
+      username: process.env.HUBOT_SLACK_BOTNAME,
+      as_user: true,
+    });
+
+sendConfirmation = (msg, message) ->
+  msg.send({
+      attachments: [{
+          title: 'Success! ' + message,
+          fallback: 'Success! ' + message,
+          color: "#2FA44F"
+      }],
+      username: process.env.HUBOT_SLACK_BOTNAME,
+      as_user: true,
+    });
