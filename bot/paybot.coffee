@@ -19,10 +19,11 @@
 #   philip-scott
 
 module.exports = (robot) ->
-  robot.respond /pay ([^ ]*) to ([^ ]*)$/i, (msg) ->
+  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*)$/i, (msg) ->
     amount = parseFloat(msg.match[1])
-    msg.reply "DEMO: payment register for " + amount + " to " + msg.match[2]
-  robot.respond /pay ([^ ]*) to ([^ ]*) for ([^ ]*)$/i, (msg) ->
+    user = robot.brain.userForName(msg.match[2])
+    msg.reply "DEMO: payment register for " + amount + " to " + require('util').inspect msg
+  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*) for ([^ ]*)$/i, (msg) ->
     amount = parseFloat(msg.match[1])
     msg.reply "DEMO: payment register for " + amount + " to " + msg.match[2] + " for " + msg.match[3]
   robot.respond /balance$/i, (msg) ->
