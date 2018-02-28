@@ -21,7 +21,7 @@
 
 
 module.exports = (robot) ->
-  robot.respond /pay ([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
+  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
     valid = paymentValidator(robot, msg)
     if not valid
       return
@@ -30,7 +30,7 @@ module.exports = (robot) ->
     user = robot.brain.userForName(msg.match[2])
     sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name
 
-  robot.respond /pay ([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
+  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
     valid = paymentValidator(robot, msg)
     if not valid
       return
@@ -59,6 +59,10 @@ paymentValidator = (robot, msg) ->
   amount = parseFloat(msg.match[1])
   if amount <= 0 or isNaN amount
     sendError msg, "Amount must be greater than 0"
+    return false
+
+  if amount > 2048
+    sendError msg, "You should not be sending this much money"
     return false
 
   payer = msg.message.user
