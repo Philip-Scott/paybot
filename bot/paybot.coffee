@@ -18,7 +18,7 @@
 # Author:
 #   philip-scott
 
-
+PAY_HELP = '- `pay X to @person` - Adds a payment of X to person\n- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
 
 module.exports = (robot) ->
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
@@ -45,13 +45,14 @@ module.exports = (robot) ->
   robot.respond /balance me\s$/i, (msg) ->
     msg.reply "DEMO: Showing your balance: "
 
-  robot.respond /balance for ([^ ]*)\s$/i, (msg) ->
+  robot.respond /balance for ([\w|\s]*)\s$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance for event " + msg.match[1]
 
   robot.respond /balance me for ([\w|\s]*)\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your balance for event  " + msg.match[1]
 
-  robot.respond /testing/, (msg) ->
+  robot.respond /pay(\s+help)?\s*$/, (msg) ->
+    sendMessage msg, PAY_HELP
 
 
 
@@ -86,24 +87,44 @@ paymentValidator = (robot, msg) ->
 
   return true
 
+
+
 sendError = (msg, message) ->
   msg.send({
-      attachments: [{
-          title: 'Error: ' + message,
-          fallback: 'Error: ' + message,
-          color: "#D50200"
-      }],
-      username: process.env.HUBOT_SLACK_BOTNAME,
-      as_user: true,
-    });
+    attachments: [{
+        title: 'Error: ' + message,
+        fallback: 'Error: ' + message,
+        color: "#ed5353"
+    }],
+    username: process.env.HUBOT_SLACK_BOTNAME,
+    as_user: true,
+  });
+
+
 
 sendConfirmation = (msg, message) ->
   msg.send({
-      attachments: [{
-          title: 'Success! ' + message,
-          fallback: 'Success! ' + message,
-          color: "#2FA44F"
-      }],
-      username: process.env.HUBOT_SLACK_BOTNAME,
-      as_user: true,
-    });
+    attachments: [{
+        title: 'Success! ' + message,
+        fallback: 'Success! ' + message,
+        color: "#9bdb4d"
+    }],
+    username: process.env.HUBOT_SLACK_BOTNAME,
+    as_user: true,
+  });
+
+
+
+sendMessage = (msg, message) ->
+  msg.send({
+    attachments: [{
+        title: 'Your Help Is Here!',
+        fallback: message,
+        color: "#64BAFF",
+        text: message,
+        mrkdwn: true,
+        footer: "Made with :heart: for Valiendo Verga"
+    }],
+    username: process.env.HUBOT_SLACK_BOTNAME,
+    as_user: true,
+  });
