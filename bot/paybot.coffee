@@ -21,7 +21,7 @@
 
 
 module.exports = (robot) ->
-  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*)$/i, (msg) ->
+  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
     valid = paymentValidator(robot, msg)
     if not valid
       return
@@ -30,25 +30,25 @@ module.exports = (robot) ->
     user = robot.brain.userForName(msg.match[2])
     sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name
 
-  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*) for ([^ ]*)$/i, (msg) ->
+  robot.respond /pay ([0-9]*.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
     valid = paymentValidator(robot, msg)
     if not valid
       return
 
     amount = parseFloat(msg.match[1])
     user = robot.brain.userForName(msg.match[2])
-    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name + "for " + msg.match[3]
+    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name + " for " + (msg.match[3])
 
-  robot.respond /balance$/i, (msg) ->
+  robot.respond /balance\s$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance: "
 
-  robot.respond /balance me$/i, (msg) ->
+  robot.respond /balance me\s$/i, (msg) ->
     msg.reply "DEMO: Showing your balance: "
 
-  robot.respond /balance for ([^ ]*)$/i, (msg) ->
+  robot.respond /balance for ([^ ]*)\s$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance for event " + msg.match[1]
 
-  robot.respond /balance me for ([^ ]*)$/i, (msg) ->
+  robot.respond /balance me for ([\w|\s]*)\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your balance for event  " + msg.match[1]
 
   robot.respond /testing/, (msg) ->
@@ -57,7 +57,7 @@ module.exports = (robot) ->
 
 paymentValidator = (robot, msg) ->
   amount = parseFloat(msg.match[1])
-  if amount <= 0
+  if amount <= 0 or isNaN amount
     sendError msg, "Amount must be greater than 0"
     return false
 
