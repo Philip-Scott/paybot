@@ -7,7 +7,7 @@ exports.handler = (event, context, callback) => {
     const amount = event.amount;
 
     if (payer == undefined || receiver == undefined || receiverName == undefined || teamID == undefined || amount == undefined || payer == receiver || amount <= 0) {
-        callback(null, {error: "Server validation failed"});
+        callback(null, { error: "Server validation failed" });
     }
 
     let message = {
