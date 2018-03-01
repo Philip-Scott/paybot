@@ -20,7 +20,10 @@
 
 request = require('request')
 
-PAY_HELP = '- `pay X to @person` - Adds a payment of X to person\n- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
+PAY_HELP = [
+  '- `pay X to @person` - Adds a payment of X to person',
+  '- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
+]
 
 module.exports = (robot) ->
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
@@ -42,7 +45,7 @@ module.exports = (robot) ->
     msg.reply "DEMO: Showing your balance for event  " + msg.match[1]
 
   robot.respond /pay(\s+help)?\s*$/, (msg) ->
-    sendMessage msg, PAY_HELP
+    sendMessage msg, PAY_HELP.join('\n')
 
 
 
@@ -67,7 +70,7 @@ paymentValidator = (robot, msg) ->
     sendError msg, "This user cannot receive a payment"
     return false
 
-  if (payer is null or payer is undefined or payer.is_bot or payer.is_restricted or payer.is_app_user)
+  if (payer.is_bot or payer.is_restricted or payer.is_app_user)
     sendError msg, "You're not allowed to send a payment"
     return false
 
