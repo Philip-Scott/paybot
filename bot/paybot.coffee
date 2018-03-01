@@ -18,34 +18,24 @@
 # Author:
 #   philip-scott
 
+request = require('request');
+
 PAY_HELP = '- `pay X to @person` - Adds a payment of X to person\n- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
 
 module.exports = (robot) ->
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
-    valid = paymentValidator(robot, msg)
-    if not valid
-      return
-
-    amount = parseFloat(msg.match[1])
-    user = robot.brain.userForName(msg.match[2])
-    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name
+    paymentValidator(robot, msg)
 
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
-    valid = paymentValidator(robot, msg)
-    if not valid
-      return
+    paymentValidator(robot, msg)
 
-    amount = parseFloat(msg.match[1])
-    user = robot.brain.userForName(msg.match[2])
-    sendConfirmation msg, "Payment for $" + amount + " sent to @" + user.name + " for " + (msg.match[3])
-
-  robot.respond /balance\s$/i, (msg) ->
+  robot.respond /balance\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance: "
 
-  robot.respond /balance me\s$/i, (msg) ->
+  robot.respond /balance me\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your balance: "
 
-  robot.respond /balance for ([\w|\s]*)\s$/i, (msg) ->
+  robot.respond /balance for ([\w|\s]*)\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance for event " + msg.match[1]
 
   robot.respond /balance me for ([\w|\s]*)\s*$/i, (msg) ->
@@ -85,8 +75,18 @@ paymentValidator = (robot, msg) ->
     sendError msg, "You're not allowed to send a payment to yourself"
     return false
 
-  return true
+  message = msg.match[3];
 
+  payload = {
+    'payer': payer.id,
+    'receiverID': receiver.slack.id,
+    'receiverName': receiver.slack.real_name,
+    'tag': message,
+    'teamID' : receiver.slack.team_id,
+    'amount' : amount
+  }
+
+  sendPayment msg, payload
 
 
 sendError = (msg, message) ->
@@ -101,7 +101,6 @@ sendError = (msg, message) ->
   });
 
 
-
 sendConfirmation = (msg, message) ->
   msg.send({
     attachments: [{
@@ -112,7 +111,6 @@ sendConfirmation = (msg, message) ->
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
   });
-
 
 
 sendMessage = (msg, message) ->
@@ -128,3 +126,20 @@ sendMessage = (msg, message) ->
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
   });
+
+
+sendPayment = (msg, object) ->
+  request({
+    url: process.env.PAYBOT_URL + 'pay',
+    method: "POST",
+    json: true,
+    headers: {
+      'x-api-key': process.env.PAYBOT_API_KEY
+    },
+    body: object
+  }, (error, response, body) ->
+      if response.body.error isnt undefined
+        sendError msg, response.body.error
+      else
+        sendConfirmation msg, response.body.message
+  );
