@@ -18,7 +18,7 @@
 # Author:
 #   philip-scott
 
-request = require('request');
+request = require('request')
 
 PAY_HELP = '- `pay X to @person` - Adds a payment of X to person\n- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
 
@@ -75,15 +75,15 @@ paymentValidator = (robot, msg) ->
     sendError msg, "You're not allowed to send a payment to yourself"
     return false
 
-  message = msg.match[3];
+  message = msg.match[3]
 
   payload = {
     'payer': payer.id,
     'receiverID': receiver.slack.id,
     'receiverName': receiver.slack.real_name,
     'tag': message,
-    'teamID' : receiver.slack.team_id,
-    'amount' : amount
+    'teamID': receiver.slack.team_id,
+    'amount': amount
   }
 
   sendPayment msg, payload
@@ -98,7 +98,7 @@ sendError = (msg, message) ->
     }],
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
-  });
+  })
 
 
 sendConfirmation = (msg, message) ->
@@ -110,7 +110,7 @@ sendConfirmation = (msg, message) ->
     }],
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
-  });
+  })
 
 
 sendMessage = (msg, message) ->
@@ -125,7 +125,7 @@ sendMessage = (msg, message) ->
     }],
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
-  });
+  })
 
 
 sendPayment = (msg, object) ->
@@ -142,4 +142,4 @@ sendPayment = (msg, object) ->
         sendError msg, response.body.error
       else
         sendConfirmation msg, response.body.message
-  );
+  )
