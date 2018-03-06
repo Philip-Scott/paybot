@@ -27,10 +27,10 @@ PAY_HELP = [
 
 module.exports = (robot) ->
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
-    paymentValidator(robot, msg)
+    paymentValidator robot, msg
 
   robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
-    paymentValidator(robot, msg)
+    paymentValidator robot, msg
 
   robot.respond /balance\s*$/i, (msg) ->
     msg.reply "DEMO: Showing your team's balance: "
@@ -46,8 +46,6 @@ module.exports = (robot) ->
 
   robot.respond /pay(\s+help)?\s*$/, (msg) ->
     sendMessage msg, PAY_HELP.join('\n')
-
-
 
 paymentValidator = (robot, msg) ->
   amount = parseFloat(msg.match[1])

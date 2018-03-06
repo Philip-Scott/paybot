@@ -9,7 +9,7 @@ exports.handler = (event, context, callback) => {
     const teamID = event.teamID;
     const amount = event.amount;
 
-    if (payer == undefined || receiver == undefined || receiverName == undefined || teamID == undefined || amount == undefined || payer == receiver || amount <= 0) {
+    if (!payer || !receiver || !receiverName || !teamID || !amount || payer == receiver || amount <= 0) {
         callback(null, { error: "Server validation failed" });
     }
 
@@ -18,19 +18,24 @@ exports.handler = (event, context, callback) => {
     };
 
     if (tag != undefined) {
-        message.message += " for " + tag
+        message.message += " for " + tag;
     } else {
-        tag = 'value'
+        tag = '~value';
     }
 
-    let item = {
+    tag = "~value";
+
+    let payerItem = {
+        'team': { S: teamID },
+        'user': { S: payer },
+    };
+
+    let receiverItem = {
         'team': { S: teamID },
         'user': { S: receiver },
     };
 
-    item[tag] = { N: String(amount) };
-
-    var params = {
+    var receiverParams = {
         KeyConditionExpression: '#t = :team and #u = :user',
         TableName: 'paybot',
         ExpressionAttributeNames: {
@@ -41,33 +46,72 @@ exports.handler = (event, context, callback) => {
             ':team': teamID,
             ':user': receiver
         },
+    };
 
+    var payerParams = {
+        KeyConditionExpression: '#t = :team and #u = :user',
+        TableName: 'paybot',
+        ExpressionAttributeNames: {
+            "#u": "user",
+            "#t": "team"
+        },
+        ExpressionAttributeValues: {
+            ':team': teamID,
+            ':user': payer
+        },
     };
 
     var docClient = new aws.DynamoDB.DocumentClient();
 
-    docClient.query(params, function(err, data) {
-        if (err) {
-            console.error("Unable to query. Error:", JSON.stringify(err, null, 2));
-        } else {
-            console.log("Query succeeded.");
-            console.log(data.Items[0]);
-            data.Items.forEach((item) => {
-                console.log(" -", item.year + ": " + item.title);
-            });
+    var queries = [];
+    queries.push (docClient.query(receiverParams).promise());
+    queries.push (docClient.query(payerParams).promise());
+
+    Promise.all(queries).then((results) => {
+        var receiverData = results[0].Items[0];
+        var payerData = results[1].Items[0];
+
+        var receiverValue = (receiverData && receiverData[tag]) ? Number(receiverData[tag]) : 0;
+        var payerValue = (payerData && payerData[tag]) ? Number(payerData[tag]) : 0;
+
+        receiverValue += amount;
+        payerValue -= amount;
+
+        receiverItem[tag] = { N: String(receiverValue) };
+        payerItem[tag] = { N: String(payerValue) };
+
+        if(tag != "~value") {
+            tag = "~value";
+            receiverValue = (receiverData && receiverData[tag]) ? Number(receiverData[tag]) : 0;
+            payerValue = (payerData && payerData[tag]) ? Number(payerData[tag]) : 0;
+
+            receiverValue += amount;
+            payerValue -= amount;
+
+            receiverItem[tag] = { N: String(receiverValue) };
+            payerItem[tag] = { N: String(payerValue) };
         }
+
+        receiverParams = {
+            TableName: 'paybot',
+            Item: receiverItem,
+        };
+        payerParams = {
+            TableName: 'paybot',
+            Item: payerItem,
+        };
+
+        queries = [];
+
+        queries.push(dynamo.putItem(receiverParams).promise());
+        queries.push(dynamo.putItem(payerParams).promise());
+
+        Promise.all(queries).then(() => {
+            callback(null, message);
+        }).catch((err) => {
+            callback(null, { error: JSON.stringify(err) });
+        });
+    }).catch((err) => {
+        callback(null, { error: JSON.stringify(err) });
     });
-
-    // var params = {
-    //     TableName: 'paybot',
-    //     Item: item
-    // };
-
-    // dynamo.putItem(params, function(err, data) {
-    //     if (err) {
-    //         callback(null, { error: JSON.stringify(err) });
-    //     } else {
-    //         callback(null, message);
-    //     }
-    // });
 };
