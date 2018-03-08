@@ -1,5 +1,17 @@
 const aws = require('aws-sdk');
-const dynamo = new aws.DynamoDB({apiVersion: '2012-10-08'});
+const https = require('https');
+const dynamo = new aws.DynamoDB({
+    apiVersion: '2012-10-08',
+    region: "us-west-2",
+    httpOptions: {
+        agent: new https.Agent({
+            rejectUnauthorized: true,
+            keepAlive: true
+        })
+    }
+});
+
+const DEFAULT_TAG = "~value";
 
 exports.handler = (event, context, callback) => {
     const payer = event.payer;
@@ -22,8 +34,6 @@ exports.handler = (event, context, callback) => {
     } else {
         tag = '~value';
     }
-
-    tag = "~value";
 
     let payerItem = {
         'team': { S: teamID },
@@ -61,7 +71,7 @@ exports.handler = (event, context, callback) => {
         },
     };
 
-    var docClient = new aws.DynamoDB.DocumentClient();
+    var docClient = new aws.DynamoDB.DocumentClient({ service: dynamo });
 
     var queries = [];
     queries.push (docClient.query(receiverParams).promise());
@@ -80,31 +90,60 @@ exports.handler = (event, context, callback) => {
         receiverItem[tag] = { N: String(receiverValue) };
         payerItem[tag] = { N: String(payerValue) };
 
-        if(tag != "~value") {
-            tag = "~value";
-            receiverValue = (receiverData && receiverData[tag]) ? Number(receiverData[tag]) : 0;
-            payerValue = (payerData && payerData[tag]) ? Number(payerData[tag]) : 0;
+        receiverParams = {
+            TableName: 'paybot',
+            Key:{
+                "team": teamID,
+                "user": receiver
+            },
+            UpdateExpression: `set #k = :a`,
+            ExpressionAttributeNames:{
+                "#k": tag
+            },
+            ExpressionAttributeValues:{
+                ":a": receiverValue,
+            },
+            ReturnValues:"UPDATED_NEW"
+        };
+
+        payerParams = {
+            TableName: 'paybot',
+            Key:{
+                "team": teamID,
+                "user": payer
+            },
+            UpdateExpression: `set #k = :a`,
+            ExpressionAttributeNames:{
+                "#k": tag
+            },
+            ExpressionAttributeValues: {
+                ":a": payerValue,
+            },
+            ReturnValues:"UPDATED_NEW"
+        };
+
+        if(tag != DEFAULT_TAG) {
+            receiverValue = (receiverData && receiverData[DEFAULT_TAG]) ? Number(receiverData[DEFAULT_TAG]) : 0;
+            payerValue = (payerData && payerData[DEFAULT_TAG]) ? Number(payerData[DEFAULT_TAG]) : 0;
 
             receiverValue += amount;
             payerValue -= amount;
 
-            receiverItem[tag] = { N: String(receiverValue) };
-            payerItem[tag] = { N: String(payerValue) };
-        }
+            receiverItem[DEFAULT_TAG] = { N: String(receiverValue) };
+            payerItem[DEFAULT_TAG] = { N: String(payerValue) };
 
-        receiverParams = {
-            TableName: 'paybot',
-            Item: receiverItem,
-        };
-        payerParams = {
-            TableName: 'paybot',
-            Item: payerItem,
-        };
+            payerParams.UpdateExpression = 'set #k = :a, #b = :b';
+            receiverParams.UpdateExpression = 'set #k = :a, #b = :b';
+            payerParams.ExpressionAttributeNames['#b'] = DEFAULT_TAG;
+            receiverParams.ExpressionAttributeNames['#b'] = DEFAULT_TAG;
+            payerParams.ExpressionAttributeValues[':b'] = payerValue;
+            receiverParams.ExpressionAttributeValues[':b'] = receiverValue;
+        }
 
         queries = [];
 
-        queries.push(dynamo.putItem(receiverParams).promise());
-        queries.push(dynamo.putItem(payerParams).promise());
+        queries.push(docClient.update(receiverParams).promise());
+        queries.push(docClient.update(payerParams).promise());
 
         Promise.all(queries).then(() => {
             callback(null, message);
