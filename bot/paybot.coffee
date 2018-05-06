@@ -22,33 +22,55 @@ request = require('request')
 
 PAY_HELP = [
   '- `pay X to @person` - Adds a payment of X to person',
-  '- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT'
+  '- `pay <x> to <person> for <EVENT>` - Adds a payment for an EVENT',
+  '- `balance`  Gets the group\'s balance',
+  '- `balance me` Gets your balance',
+  '- `balance for <EVENT>` Gets balance for EVENT'
 ]
 
-module.exports = (robot) ->
-  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*)\s*$/i, (msg) ->
-    paymentValidator robot, msg
+COLOR_ERROR = "#ed5353"
+COLOR_SUCCESS = "#9bdb4d"
+COLOR_NORMAL = "#64BAFF"
 
-  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]*) for ([\w|\s]*)\s*$/i, (msg) ->
-    paymentValidator robot, msg
+module.exports = (robot) ->
+  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]+)\s*$/i, (msg) ->
+    amount = parseFloat(msg.match[1])
+    receiver = robot.brain.userForName msg.match[2]
+    paymentValidator robot, msg, amount, receiver
+
+  robot.respond /pay \$?([0-9]*\.?[0-9]?[0-9]?) to @([^ ]+) for ([\w|\s]+)\s*$/i, (msg) ->
+    amount = parseFloat(msg.match[1])
+    receiver = robot.brain.userForName msg.match[2]
+    tag = msg.match[3]
+    paymentValidator robot, msg, amount, receiver, tag
+
+  robot.respond /pay \s*@([^ ]+) \s*\$?([0-9]*\.?[0-9]?[0-9]?)\s*$/i, (msg) ->
+    amount = parseFloat(msg.match[2])
+    receiver = robot.brain.userForName msg.match[1]
+    paymentValidator robot, msg, amount, receiver
+
+  robot.respond /pay \s*@([^ ]+) \s*\$?([0-9]*\.?[0-9]?[0-9]?)\s* for ([\w|\s]+)\s*$/i, (msg) ->
+    amount = parseFloat(msg.match[2])
+    receiver = robot.brain.userForName msg.match[1]
+    tag = msg.match[3]
+    paymentValidator robot, msg, amount, receiver, tag
 
   robot.respond /balance\s*$/i, (msg) ->
-    msg.reply "DEMO: Showing your team's balance: "
+    sendBalance robot, msg
 
   robot.respond /balance me\s*$/i, (msg) ->
-    msg.reply "DEMO: Showing your balance: "
+    sendBalance robot, msg, "ME"
 
   robot.respond /balance for ([\w|\s]*)\s*$/i, (msg) ->
-    msg.reply "DEMO: Showing your team's balance for event " + msg.match[1]
+    sendBalance robot, msg, undefined, "EVENT"
 
   robot.respond /balance me for ([\w|\s]*)\s*$/i, (msg) ->
-    msg.reply "DEMO: Showing your balance for event  " + msg.match[1]
+    sendBalance robot, msg, "ME", "EVENT"
 
   robot.respond /pay(\s+help)?\s*$/, (msg) ->
-    sendMessage msg, PAY_HELP.join('\n')
+    sendHelp msg, PAY_HELP.join('\n')
 
-paymentValidator = (robot, msg) ->
-  amount = parseFloat(msg.match[1])
+paymentValidator = (robot, msg, amount, receiver, tag) ->
   if amount <= 0 or isNaN amount
     sendError msg, "Amount must be greater than 0"
     return false
@@ -56,9 +78,6 @@ paymentValidator = (robot, msg) ->
   if amount > 2048
     sendError msg, "You should not be sending this much money"
     return false
-
-  payer = msg.message.user
-  receiver = robot.brain.userForName msg.match[2]
 
   if receiver is null
     sendError msg, "This user does not exist"
@@ -68,6 +87,8 @@ paymentValidator = (robot, msg) ->
     sendError msg, "This user cannot receive a payment"
     return false
 
+  payer = msg.message.user
+
   if (payer.is_bot or payer.is_restricted or payer.is_app_user)
     sendError msg, "You're not allowed to send a payment"
     return false
@@ -76,50 +97,72 @@ paymentValidator = (robot, msg) ->
     sendError msg, "You're not allowed to send a payment to yourself"
     return false
 
-  message = msg.match[3]
-
   payload = {
     'payer': payer.id,
     'receiverID': receiver.slack.id,
     'receiverName': receiver.slack.real_name,
-    'tag': message,
+    'tag': tag,
     'teamID': receiver.slack.team_id,
     'amount': amount
   }
 
   sendPayment msg, payload
 
-
 sendError = (msg, message) ->
   msg.send({
     attachments: [{
         title: 'Error: ' + message,
         fallback: 'Error: ' + message,
-        color: "#ed5353"
+        color: COLOR_ERROR
     }],
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
   })
 
-
-sendConfirmation = (msg, message) ->
-  msg.send({
+sendConfirmation = (msg, message, extraInfo, robot) ->
+  message = {
     attachments: [{
-        title: 'Success! ' + message,
-        fallback: 'Success! ' + message,
-        color: "#9bdb4d"
+        title: message,
+        fallback: message,
+        color: COLOR_SUCCESS,
+        fields: new Array,
     }],
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
-  })
+  }
+
+  if extraInfo isnt undefined
+    fields = []
+    if extraInfo.people.length > 0
+      extraInfo.people.forEach ((element) ->
+        name = (robot.brain.userForId element.user).real_name
+        bill = {
+          title: name
+          value: element.value
+          short: true
+        }
+        fields.push bill
+      )
+    else
+      message.attachments[0].color = COLOR_NORMAL
+      error = {
+        title: "There's nothing here"
+        value: "Try using the pay command first!"
+        short: true
+      }
+      fields.push error
+
+    message.attachments[0].fields = fields
 
 
-sendMessage = (msg, message) ->
+  msg.send(message)
+
+sendHelp = (msg, message) ->
   msg.send({
     attachments: [{
         title: 'Your Help Is Here!',
         fallback: message,
-        color: "#64BAFF",
+        color: COLOR_NORMAL,
         text: message,
         mrkdwn: true,
         footer: "Made with :heart: for Valiendo Verga"
@@ -127,7 +170,6 @@ sendMessage = (msg, message) ->
     username: process.env.HUBOT_SLACK_BOTNAME,
     as_user: true,
   })
-
 
 sendPayment = (msg, object) ->
   request({
@@ -143,4 +185,35 @@ sendPayment = (msg, object) ->
         sendError msg, response.body.error
       else
         sendConfirmation msg, response.body.message
+  )
+
+sendBalance = (robot, msg, fromMe, useTag) ->
+  payload = {
+    "teamID": msg.message.user.team_id
+  }
+
+  if fromMe
+    messageTitle = "Your Balance "
+    payload.userID = msg.message.user.id
+  else
+    messageTitle = "Team Balance "
+
+  if useTag
+    tag = msg.match[1]
+    payload.tag = tag
+    messageTitle += "for " + tag
+
+  request({
+    url: process.env.PAYBOT_URL + 'balance',
+    method: "POST",
+    json: true,
+    headers: {
+      'x-api-key': process.env.PAYBOT_API_KEY
+    },
+    body: payload
+  }, (error, response, body) ->
+      if response.body.error isnt undefined
+        sendError msg, response.body.error
+      else
+        sendConfirmation msg, messageTitle, response.body, robot
   )

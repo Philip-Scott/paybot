@@ -17,7 +17,7 @@ exports.handler = (event, context, callback) => {
     const payer = event.payer;
     const receiver = event.receiverID;
     const receiverName = event.receiverName;
-    let tag = event.tag;
+    let tag = (event.tag ? event.tag.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : undefined);
     const teamID = event.teamID;
     const amount = event.amount;
 
