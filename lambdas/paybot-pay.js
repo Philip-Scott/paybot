@@ -12,6 +12,7 @@ const dynamo = new aws.DynamoDB({
 });
 
 const DEFAULT_TAG = "~value";
+const docClient = new aws.DynamoDB.DocumentClient({ service: dynamo });
 
 exports.handler = (event, context, callback) => {
     const payer = event.payer;
@@ -20,8 +21,9 @@ exports.handler = (event, context, callback) => {
     let tag = (event.tag ? event.tag.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : undefined);
     const teamID = event.teamID;
     const amount = event.amount;
+    const apiKey = event.apiKey;
 
-    if (!payer || !receiver || !receiverName || !teamID || !amount || payer == receiver || amount <= 0) {
+    if (!payer || !receiver || !receiverName || !teamID || !amount || !apiKey || payer == receiver || amount <= 0) {
         callback(null, { error: "Server validation failed" });
     }
 
@@ -45,39 +47,21 @@ exports.handler = (event, context, callback) => {
         'user': { S: receiver },
     };
 
-    var receiverParams = {
-        KeyConditionExpression: '#t = :team and #u = :user',
-        TableName: 'paybot',
-        ExpressionAttributeNames: {
-            "#u": "user",
-            "#t": "team"
-        },
-        ExpressionAttributeValues: {
-            ':team': teamID,
-            ':user': receiver
-        },
-    };
-
-    var payerParams = {
-        KeyConditionExpression: '#t = :team and #u = :user',
-        TableName: 'paybot',
-        ExpressionAttributeNames: {
-            "#u": "user",
-            "#t": "team"
-        },
-        ExpressionAttributeValues: {
-            ':team': teamID,
-            ':user': payer
-        },
-    };
-
-    var docClient = new aws.DynamoDB.DocumentClient({ service: dynamo });
+    var receiverParams = getParameters (teamID, receiver);
+    var payerParams = getParameters (teamID, payer);
+    var authParams = getParameters (apiKey, teamID);
 
     var queries = [];
     queries.push (docClient.query(receiverParams).promise());
     queries.push (docClient.query(payerParams).promise());
+    queries.push (docClient.query(authParams).promise());
 
     Promise.all(queries).then((results) => {
+        if (results[2].Count == 0) {
+            callback(null, { error: "Invalid API Key" });
+            return;
+        }
+
         var receiverData = results[0].Items[0];
         var payerData = results[1].Items[0];
 
@@ -153,4 +137,19 @@ exports.handler = (event, context, callback) => {
     }).catch((err) => {
         callback(null, { error: JSON.stringify(err) });
     });
+};
+
+const getParameters = (teamID, userID) => {
+    return {
+        KeyConditionExpression: '#t = :team and #u = :user',
+        TableName: 'paybot',
+        ExpressionAttributeNames: {
+            "#u": "user",
+            "#t": "team"
+        },
+        ExpressionAttributeValues: {
+            ':team': teamID,
+            ':user': userID
+        },
+    };
 };

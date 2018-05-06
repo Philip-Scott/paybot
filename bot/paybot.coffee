@@ -103,7 +103,8 @@ paymentValidator = (robot, msg, amount, receiver, tag) ->
     'receiverName': receiver.slack.real_name,
     'tag': tag,
     'teamID': receiver.slack.team_id,
-    'amount': amount
+    'amount': amount,
+    "apiKey": process.env.PAYBOT_API_KEY
   }
 
   sendPayment msg, payload
@@ -189,7 +190,8 @@ sendPayment = (msg, object) ->
 
 sendBalance = (robot, msg, fromMe, useTag) ->
   payload = {
-    "teamID": msg.message.user.team_id
+    "teamID": msg.message.user.team_id,
+    "apiKey": process.env.PAYBOT_API_KEY
   }
 
   if fromMe

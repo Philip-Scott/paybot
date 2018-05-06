@@ -4,5 +4,6 @@
   "receiverName": "real_name",
   "teamID": "team_id1",
   "tag": "Sushi",
-  "amount": 120
+  "amount": 120,
+  "apiKey": "team1_KEY"
 }

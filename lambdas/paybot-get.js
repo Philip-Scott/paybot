@@ -11,25 +11,32 @@ const dynamo = new aws.DynamoDB({
     }
 });
 
+const docClient = new aws.DynamoDB.DocumentClient({ service: dynamo });
 const DEFAULT_TAG = "~value";
 
 exports.handler = (event, context, callback) => {
-    const tag = (event.tag ? event.tag : DEFAULT_TAG).normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const tag = (event.tag ? event.tag.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : DEFAULT_TAG);
     const teamID = event.teamID;
     const userID = event.userID;
+    const apiKey = event.apiKey;
 
-    if (!teamID) {
+    if (!teamID || !apiKey) {
         callback(null, { error: "Server validation failed" });
     }
 
     const teamParams = getParamenters(teamID, userID);
-
-    const docClient = new aws.DynamoDB.DocumentClient({ service: dynamo });
+    const authParams = getParamenters(apiKey, teamID);
 
     const queries = [];
     queries.push (docClient.query(teamParams).promise());
+    queries.push (docClient.query(authParams).promise());
 
     Promise.all(queries).then((results) => {
+        if (results[1].Count == 0) {
+            callback(null, { error: "Invalid API Key" });
+            return;
+        }
+
         const requestData = results[0].Items;
 
         const result = {
@@ -46,6 +53,7 @@ exports.handler = (event, context, callback) => {
         });
         callback(null, result);
     }).catch((err) => {
+        console.log(err);
         callback(null, { error: JSON.stringify(err) });
     });
 };
